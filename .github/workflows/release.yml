@@ -21,20 +21,29 @@ jobs:
           cp -r google-cloud-platform release/
           tar -czvf release/daily-scripts.tar.gz -C release google-cloud-platform
 
+      - name: Calculate SHA256
+        id: calculate_sha256
+        run: |
+          sha256_value=$(sha256sum release/daily-scripts.tar.gz | awk '{ print $1 }')
+          echo "SHA256: $sha256_value"
+          echo "sha256_value=$sha256_value" >> $GITHUB_ENV
+
+      - name: Get Version
+        id: get_version
+        run: |
+          version=$(echo ${{ github.ref }} | sed 's/refs\/tags\/v//')
+          echo "version=$version" >> $GITHUB_ENV
+
       - name: Update Formula
         run: |
-          formula_file="Formula/daily-scripts.rb"
-          sha256=$(sha256sum release/daily-scripts.tar.gz | awk '{ print $1 }')
-          sed -i "s/sha256 \".*\"/sha256 \"$sha256_value\"/" $formula_file
+          ./update_formula.sh ${{ env.sha256_value }} ${{ env.version }}
 
       - name: Commit Formula Update
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           git add Formula/daily-scripts.rb
-          git commit -m "Update formula sha256 to $sha256_value"
-          git status
-          set -x
+          git commit -m "Update formula to version ${{ env.version }} with sha256 ${{ env.sha256_value }}"
           git push origin main
 
       - name: Create GitHub Release
@@ -47,7 +56,7 @@ jobs:
           release_name: Release ${{ github.ref }}
           body: |
             SHA256 Checksum:
-            ${{ env.EVALUATED_SHA }}
+            ${{ env.sha256_value }}
           draft: false
           prerelease: false
 
@@ -57,6 +66,4 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: release/daily-scripts.tar.gz
-          asset_name: daily-scripts.tar.gz
-          asset_content_type: application/gzip
+          asset_path: release/daily-scripts.tar.
