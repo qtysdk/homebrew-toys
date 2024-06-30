@@ -21,16 +21,10 @@ jobs:
           cp -r google-cloud-platform release/
           tar -czvf release/daily-scripts.tar.gz -C release google-cloud-platform
 
-      - name: Calculate SHA256
-        id: calculate_sha256
-        run: |
-          sha256=$(sha256sum release/daily-scripts.tar.gz | awk '{ print $1 }')
-          echo "EVALUATED_SHA=$sha256" >> $GITHUB_ENV
-
       - name: Update Formula
         run: |
           formula_file="Formula/daily-scripts.rb"
-          sha256_value=$(grep EVALUATED_SHA $GITHUB_ENV | cut -d '=' -f2)
+          sha256=$(sha256sum release/daily-scripts.tar.gz | awk '{ print $1 }')
           sed -i "s/sha256 \".*\"/sha256 \"$sha256_value\"/" $formula_file
 
       - name: Commit Formula Update
