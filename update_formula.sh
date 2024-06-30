@@ -14,6 +14,7 @@ class DailyScripts < Formula
   version "${VERSION}"
 
   def install
+    ohai "Current directory: #{Dir.pwd}"
     bin.install "google-cloud-platform/gcp-pick-project.sh"
     bin.install "google-cloud-platform/gcp-remember-project.sh"
   end
