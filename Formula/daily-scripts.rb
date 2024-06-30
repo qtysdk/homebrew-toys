@@ -2,7 +2,7 @@ class DailyScripts < Formula
     desc "Collection of daily scripts"
     homepage "https://github.com/qtysdk/toys"
     url "https://github.com/qtysdk/toys/releases/download/v0.0.2/daily-scripts.tar.gz"
-    sha256 "your_tarball_sha256_checksum"
+    sha256 ""
     version "0.0.2"
   
     def install
