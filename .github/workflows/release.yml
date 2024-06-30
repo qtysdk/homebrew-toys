@@ -3,39 +3,62 @@ name: Release
 on:
   push:
     tags:
-      - 'v*.*.*'  # Triggers the workflow on version tags, e.g., v1.0.0
+      - "v*.*.*" # Triggers the workflow on version tags, e.g., v1.0.0
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v2
+      - name: Checkout repository
+        uses: actions/checkout@v2
 
-    - name: Package Scripts
-      run: |
-        mkdir -p release
-        cp -r google-cloud-platform release/
-        tar -czvf release/daily-scripts.tar.gz -C release google-cloud-platform
+      - name: Package Scripts
+        run: |
+          mkdir -p release
+          cp -r google-cloud-platform release/
+          tar -czvf release/daily-scripts.tar.gz -C release google-cloud-platform
 
-    - name: Create GitHub Release
-      id: create_release
-      uses: actions/create-release@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        tag_name: ${{ github.ref }}
-        release_name: Release ${{ github.ref }}
-        draft: false
-        prerelease: false
+      - name: Calculate SHA256
+        id: calculate_sha256
+        run: |
+          sha256=$(sha256sum release/daily-scripts.tar.gz | awk '{ print $1 }')
+          echo "EVALUATED_SHA=$sha256" >> $GITHUB_ENV
 
-    - name: Upload Release Asset
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: release/daily-scripts.tar.gz
-        asset_name: daily-scripts.tar.gz
-        asset_content_type: application/gzip
+      - name: Update Formula
+        run: |
+          formula_file="Formula/daily-scripts.rb"
+          sha256_value=$(grep EVALUATED_SHA $GITHUB_ENV | cut -d '=' -f2)
+          sed -i "s/sha256 \".*\"/sha256 \"$sha256_value\"/" $formula_file
+
+      - name: Commit Formula Update
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add Formula/daily-scripts.rb
+          git commit -m "Update formula sha256 to $sha256_value"
+          git push origin main
+
+      - name: Create GitHub Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref }}
+          release_name: Release ${{ github.ref }}
+          body: |
+            SHA256 Checksum:
+            ${{ env.EVALUATED_SHA }}
+          draft: false
+          prerelease: false
+
+      - name: Upload Release Asset
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: release/daily-scripts.tar.gz
+          asset_name: daily-scripts.tar.gz
+          asset_content_type: application/gzip
