@@ -13,9 +13,6 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v2
 
-    - name: Set up Homebrew
-      uses: Homebrew/actions/setup-homebrew@master
-
     - name: Package Scripts
       run: |
         mkdir -p release
