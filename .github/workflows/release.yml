@@ -3,42 +3,69 @@ name: Release
 on:
   push:
     tags:
-      - 'v*.*.*'  # Triggers the workflow on version tags, e.g., v1.0.0
+      - "v*.*.*" # Triggers the workflow on version tags, e.g., v1.0.0
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v2
+      - name: Checkout repository
+        uses: actions/checkout@v2
+        with:
+          ref: main
 
-    - name: Set up Homebrew
-      uses: Homebrew/actions/setup-homebrew@master
+      - name: Package Scripts
+        run: |
+          mkdir -p release
+          cp -r google-cloud-platform release/
+          tar -czvf release/daily-scripts.tar.gz -C release google-cloud-platform
 
-    - name: Package Scripts
-      run: |
-        mkdir -p release
-        cp -r google-cloud-platform release/
-        tar -czvf release/daily-scripts.tar.gz -C release google-cloud-platform
+      - name: Calculate SHA256
+        id: calculate_sha256
+        run: |
+          sha256_value=$(sha256sum release/daily-scripts.tar.gz | awk '{ print $1 }')
+          echo "SHA256: $sha256_value"
+          echo "sha256_value=$sha256_value" >> $GITHUB_ENV
 
-    - name: Create GitHub Release
-      id: create_release
-      uses: actions/create-release@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        tag_name: ${{ github.ref }}
-        release_name: Release ${{ github.ref }}
-        draft: false
-        prerelease: false
+      - name: Get Version
+        id: get_version
+        run: |
+          version=$(echo ${{ github.ref }} | sed 's/refs\/tags\/v//')
+          echo "version=$version" >> $GITHUB_ENV
 
-    - name: Upload Release Asset
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: release/daily-scripts.tar.gz
-        asset_name: daily-scripts.tar.gz
-        asset_content_type: application/gzip
+      - name: Update Formula
+        run: |
+          ./update_formula.sh ${{ env.sha256_value }} ${{ env.version }}
+
+      - name: Commit Formula Update
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add Formula/daily-scripts.rb
+          git commit -m "Update formula"
+          git push origin main
+
+      - name: Create GitHub Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref }}
+          release_name: Release ${{ github.ref }}
+          body: |
+            SHA256 Checksum:
+            ${{ env.sha256_value }}
+          draft: false
+          prerelease: false
+
+      - name: Upload Release Asset
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: release/daily-scripts.tar.gz
+          asset_name: daily-scripts.tar.gz
+          asset_content_type: application/gzip
